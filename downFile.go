@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -104,18 +105,22 @@ func downv2(data DirStruct) string {
 	dir := data.Dir
 	s := data.Url
 	name := data.Filename
+	if filepath.IsAbs(dir) {
+		fmt.Println("不能为绝对路径")
+		return "不能为绝对路径"
+	}
 	if !isExist(dir) {
 		err := os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
 			fmt.Println(err)
-			//return "目录创建失败"
+			return "目录创建失败"
 		}
 	}
-	fpath := fmt.Sprintf(dir + "/" + name)
+	fpath := filepath.Join(dir, name)
 	newFile, err := os.Create(fpath)
 	if err != nil {
 		fmt.Println(err.Error())
-		panic(err)
+		return "文件创建错误"
 	}
 	defer newFile.Close()
 
@@ -177,10 +182,13 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+	limiter := time.Tick(time.Millisecond * 1500)
+
 	ch := make(chan string)
 	//var wg sync.WaitGroup
 	for _, v := range dataList.Data {
 		//	wg.Add(1)
+		<-limiter
 		go func(u DirStruct) {
 			fmt.Println("处理:", u)
 			ch <- downv2(u)
@@ -192,6 +200,9 @@ func main() {
 			fmt.Println(result + "文件下载完成")
 		case <-time.After(1800 * time.Second):
 			fmt.Println("Tiemout...")
+		default:
+			fmt.Println("time sleep...")
+			time.Sleep(time.Second * 1)
 		}
 	}
 }
