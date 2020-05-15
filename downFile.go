@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -10,7 +11,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -33,7 +36,7 @@ type DirStruct struct {
 func init() {
 	flag.StringVar(&d, "d", "./down-data", "下载的文件夹目录，默认为当前文件夹下的down-data目录\n")
 	flag.StringVar(&txt, "txt", "./url.txt", "下载的文件txt列表，默认为当前文件夹下的url.txt\n")
-	flag.StringVar(&data, "data", "./data.json", "下载的文件结构json，默认为当前文件夹下的data.json\n")
+	flag.StringVar(&data, "data", "data.json", "下载的文件结构json，默认为当前文件夹下的data.json\n")
 }
 
 // 逐行读取文件内容
@@ -124,7 +127,7 @@ func downv2(data DirStruct) string {
 	}
 	defer newFile.Close()
 
-	fmt.Println(name + ":文件下载中...")
+	fmt.Println(":文件下载中..." + "下载目录:" + fpath)
 	client := http.Client{Timeout: 1800 * time.Second}
 	resp, err := client.Get(s)
 	defer resp.Body.Close()
@@ -143,6 +146,25 @@ func readData(source string) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+func GetCurrentPath() (string, error) {
+	file, err := exec.LookPath(os.Args[0])
+	if err != nil {
+		return "", err
+	}
+	path, err := filepath.Abs(file)
+	if err != nil {
+		return "", err
+	}
+	i := strings.LastIndex(path, "/")
+	if i < 0 {
+		i = strings.LastIndex(path, "\\")
+	}
+	if i < 0 {
+		return "", errors.New(`error: Can't find "/" or "\".`)
+	}
+	return string(path[0 : i+1]), nil
 }
 
 func main() {
@@ -171,9 +193,14 @@ func main() {
 	*/
 
 	//v2 根据json文件自动下载数据，目录关系json配置里定义好
-	data := data
 
-	d, err := readData(data)
+	local_dir, err := GetCurrentPath()
+	if err != nil {
+		panic(err)
+	}
+	file_path := filepath.Join(local_dir, data)
+
+	d, err := readData(file_path)
 	if err != nil {
 		panic(err.Error())
 	}
